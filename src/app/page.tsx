@@ -19,14 +19,6 @@ const TABS = [
   { id: 'notes',      label: 'Notes',     icon: '📝' },
 ]
 
-const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
-
-function todayStr() {
-  const d = new Date()
-  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`
-}
-
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState('routine')
 
@@ -35,50 +27,47 @@ export default function HomePage() {
     queryFn: () => axios.get('/api/profile').then(r => r.data),
   })
 
+  const babyName = profile?.name || "Baby's"
+
   return (
     <div className="min-h-screen bg-[#FFF9F5]">
-      {/* Header */}
+      {/* ── Compact top bar ── */}
       <header className="bg-white border-b border-orange-100 sticky top-0 z-50">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center gap-3">
-          <span className="text-2xl">🧸</span>
-          <div className="flex-1 min-w-0">
-            <h1 className="font-fredoka text-lg text-brand-500 leading-none truncate">
-              {profile?.name ? `${profile.name}'s Hub` : "Baby's Daily Hub"}
-            </h1>
-            <p className="text-[11px] font-bold text-gray-400 leading-none mt-0.5">{todayStr()}</p>
-          </div>
-        </div>
+        <div className="max-w-3xl mx-auto px-4 flex items-center h-14 gap-3">
+          <span className="text-xl">🧸</span>
+          <span className="font-fredoka text-lg text-brand-500 flex-1">
+            {babyName !== "Baby's" ? `${babyName}'s Hub` : "Baby's Daily Hub"}
+          </span>
 
-        {/* Tab bar */}
-        <div className="max-w-3xl mx-auto px-4 pb-0">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-0">
+          {/* Tab nav inline in header */}
+          <nav className="flex gap-0.5">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-bold whitespace-nowrap border-b-2 transition-all ${
+                className={`px-3 py-1.5 rounded-full text-sm font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                   activeTab === tab.id
-                    ? 'text-brand-500 border-brand-500'
-                    : 'text-gray-400 border-transparent hover:text-gray-600'
+                    ? 'bg-brand-50 text-brand-500'
+                    : 'text-gray-400 hover:text-gray-600'
                 }`}
               >
-                <span className="text-base">{tab.icon}</span>
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span>{tab.icon}</span>
+                <span className="hidden md:inline">{tab.label}</span>
               </button>
             ))}
-          </div>
+          </nav>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-3xl mx-auto px-4 py-5 pb-16">
+      {/* ── Content ── */}
+      <main className="max-w-3xl mx-auto px-4 py-5 pb-20">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.18 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15 }}
           >
             {activeTab === 'routine'    && <RoutineSection />}
             {activeTab === 'tracker'    && <TrackerSection />}

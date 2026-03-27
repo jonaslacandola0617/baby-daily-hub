@@ -4,13 +4,29 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { Pencil, Trash2, Plus, Check, X, GripVertical } from 'lucide-react'
-import { Card, CardHeader, CardBody, Button, Input, Badge, CategoryDot, SectionLabel, Spinner } from '@/components/ui'
-import type { RoutineItem, Category } from '@/types'
+import { Pencil, Trash2, Plus, Check, X } from 'lucide-react'
+import { Card, CardHeader, CardBody, Button, Input, Badge, SectionLabel, Spinner } from '@/components/ui'
+import type { RoutineItem, Category, BabyProfile } from '@/types'
 
 const CATEGORIES: Category[] = ['sleep', 'meal', 'play', 'care', 'learn', 'outdoor']
-
 const emptyForm = { timeStart: '', timeEnd: '', activity: '', note: '', category: 'play' as Category }
+
+const DOT_COLORS: Record<string, string> = {
+  sleep: 'bg-blue-400', meal: 'bg-green-500', play: 'bg-amber-400',
+  care: 'bg-purple-400', learn: 'bg-teal-400', outdoor: 'bg-orange-400',
+}
+
+const DEFAULT_CHECKS = [
+  'Diaper / toilet check', 'Breakfast eaten', 'Teeth brushed',
+  'Vitamins / supplements', 'Sunscreen applied', 'Change of clothes packed',
+  'Nap bag packed (if going out)', 'Comfort toy ready for nap',
+]
+
+function formatFullDate(d: Date) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`
+}
 
 export default function RoutineSection() {
   const qc = useQueryClient()
@@ -24,10 +40,19 @@ export default function RoutineSection() {
     queryFn: () => axios.get('/api/routine').then(r => r.data),
   })
 
+  const { data: profile } = useQuery<BabyProfile>({
+    queryKey: ['profile'],
+    queryFn: () => axios.get('/api/profile').then(r => r.data),
+  })
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<RoutineItem> }) =>
       axios.patch(`/api/routine/${id}`, data).then(r => r.data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['routine'] }); toast.success('Routine updated!'); setEditingId(null) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['routine'] })
+      toast.success('Routine updated!')
+      setEditingId(null)
+    },
     onError: () => toast.error('Failed to update'),
   })
 
@@ -38,8 +63,14 @@ export default function RoutineSection() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: typeof newForm & { order: number }) => axios.post('/api/routine', data).then(r => r.data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['routine'] }); toast.success('Item added!'); setAddingNew(false); setNewForm(emptyForm) },
+    mutationFn: (data: typeof newForm & { order: number }) =>
+      axios.post('/api/routine', data).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['routine'] })
+      toast.success('Item added!')
+      setAddingNew(false)
+      setNewForm(emptyForm)
+    },
     onError: () => toast.error('Failed to add item'),
   })
 
@@ -58,19 +89,58 @@ export default function RoutineSection() {
     createMutation.mutate({ ...newForm, timeEnd: newForm.timeEnd || '', note: newForm.note || '', order: items.length })
   }
 
+  const wakeItem = items.find(i => i.activity.toLowerCase().includes('wake'))
+  const bedItem  = items.find(i => i.activity.toLowerCase().includes('bed') || i.activity.toLowerCase().includes('lights out'))
+  const napItem  = items.find(i => i.activity.toLowerCase().includes('nap'))
+  const babyName = profile?.name && profile.name !== 'Your Little One' ? profile.name : null
+
   if (isLoading) return <Spinner />
 
   return (
     <div className="space-y-4">
+
+      {/* ── Hero card — matches first screenshot ── */}
+      <div className="bg-gradient-to-br from-[#FFE8D6] to-[#FFF4EC] rounded-2xl border border-orange-200 p-5 flex items-center gap-4">
+        <span className="text-5xl leading-none select-none">⭐</span>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-fredoka text-[2rem] leading-tight text-brand-500">
+            {babyName ?? 'Your Little One'}
+          </h2>
+          <p className="text-sm font-semibold text-gray-500 mt-0.5">
+            2 years old · Today is {formatFullDate(new Date())}
+          </p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {bedItem && (
+              <span className="inline-flex items-center gap-1 bg-white border border-orange-100 rounded-full px-3 py-1 text-xs font-bold text-gray-600">
+                🌙 Bedtime {bedItem.timeStart}
+              </span>
+            )}
+            {wakeItem && (
+              <span className="inline-flex items-center gap-1 bg-white border border-orange-100 rounded-full px-3 py-1 text-xs font-bold text-gray-600">
+                ☀️ Wake {wakeItem.timeStart}
+              </span>
+            )}
+            {napItem && (
+              <span className="inline-flex items-center gap-1 bg-white border border-orange-100 rounded-full px-3 py-1 text-xs font-bold text-gray-600">
+                💤 Nap {napItem.timeStart}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Schedule card ── */}
       <Card>
         <CardHeader icon="📅" title="Daily Routine Schedule">
           <Button variant="ghost" onClick={() => { setAddingNew(true); setNewForm(emptyForm) }} className="text-xs py-1.5 px-3">
             <Plus size={13} /> Add item
           </Button>
         </CardHeader>
+
         <CardBody className="p-0">
+          {/* Add new form */}
           {addingNew && (
-            <div className="border-b border-orange-100 bg-orange-50/60 px-5 py-3 space-y-2">
+            <div className="border-b border-orange-100 bg-orange-50/60 px-5 py-4 space-y-2">
               <SectionLabel>New routine item</SectionLabel>
               <div className="grid grid-cols-2 gap-2">
                 <Input placeholder="Start time (e.g. 8:00 AM)" value={newForm.timeStart} onChange={e => setNewForm(f => ({ ...f, timeStart: e.target.value }))} />
@@ -82,7 +152,7 @@ export default function RoutineSection() {
                 <span className="text-xs font-bold text-gray-500">Category:</span>
                 {CATEGORIES.map(c => (
                   <button key={c} onClick={() => setNewForm(f => ({ ...f, category: c }))}
-                    className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full transition-all ${newForm.category === c ? 'ring-2 ring-offset-1 ring-brand-400 scale-105' : 'opacity-60'}`}>
+                    className={`rounded-full transition-all ${newForm.category === c ? 'ring-2 ring-offset-1 ring-brand-400 scale-105' : 'opacity-50'}`}>
                     <Badge category={c} />
                   </button>
                 ))}
@@ -94,11 +164,12 @@ export default function RoutineSection() {
             </div>
           )}
 
+          {/* Routine rows — layout matching first screenshot exactly */}
           <div className="divide-y divide-orange-50">
             {items.map(item => (
-              <div key={item.id} className="group px-5 py-3">
+              <div key={item.id} className="group px-5 py-3.5">
                 {editingId === item.id ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 py-1">
                     <div className="grid grid-cols-2 gap-2">
                       <Input placeholder="Start time" value={editForm.timeStart} onChange={e => setEditForm(f => ({ ...f, timeStart: e.target.value }))} />
                       <Input placeholder="End time" value={editForm.timeEnd} onChange={e => setEditForm(f => ({ ...f, timeEnd: e.target.value }))} />
@@ -109,7 +180,7 @@ export default function RoutineSection() {
                       <span className="text-xs font-bold text-gray-500">Category:</span>
                       {CATEGORIES.map(c => (
                         <button key={c} onClick={() => setEditForm(f => ({ ...f, category: c }))}
-                          className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full transition-all ${editForm.category === c ? 'ring-2 ring-offset-1 ring-brand-400 scale-105' : 'opacity-60'}`}>
+                          className={`rounded-full transition-all ${editForm.category === c ? 'ring-2 ring-offset-1 ring-brand-400 scale-105' : 'opacity-50'}`}>
                           <Badge category={c} />
                         </button>
                       ))}
@@ -120,24 +191,31 @@ export default function RoutineSection() {
                     </div>
                   </div>
                 ) : (
+                  /* ── Row layout: [time] [dot] [activity + note] [badge] [actions] ── */
                   <div className="flex items-start gap-3">
-                    <GripVertical size={14} className="text-gray-200 mt-1 flex-shrink-0" />
-                    <CategoryDot category={item.category} />
+                    {/* Time — left column, fixed width */}
+                    <span className="text-[11px] font-bold text-gray-400 whitespace-nowrap min-w-[96px] pt-1 leading-tight">
+                      {item.timeStart}{item.timeEnd ? ` – ${item.timeEnd}` : ''}
+                    </span>
+
+                    {/* Coloured dot */}
+                    <span className={`mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${DOT_COLORS[item.category] ?? 'bg-gray-400'}`} />
+
+                    {/* Activity + note */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-bold text-gray-400 whitespace-nowrap">
-                          {item.timeStart}{item.timeEnd ? ` – ${item.timeEnd}` : ''}
-                        </span>
-                        <Badge category={item.category} />
-                      </div>
-                      <p className="text-sm font-bold text-gray-800 mt-0.5">{item.activity}</p>
-                      {item.note && <p className="text-xs text-gray-400 font-semibold mt-0.5">{item.note}</p>}
+                      <p className="text-sm font-bold text-gray-800 leading-snug">{item.activity}</p>
+                      {item.note && <p className="text-xs text-gray-400 font-medium mt-0.5">{item.note}</p>}
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <button onClick={() => startEdit(item)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-brand-500 transition-colors">
+
+                    {/* Category badge */}
+                    <Badge category={item.category} />
+
+                    {/* Edit / delete — visible on hover */}
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button onClick={() => startEdit(item)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-300 hover:text-brand-500 transition-colors">
                         <Pencil size={13} />
                       </button>
-                      <button onClick={() => deleteMutation.mutate(item.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors">
+                      <button onClick={() => deleteMutation.mutate(item.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
                         <Trash2 size={13} />
                       </button>
                     </div>
@@ -149,17 +227,10 @@ export default function RoutineSection() {
         </CardBody>
       </Card>
 
-      {/* Checklist */}
       <MorningChecklist />
     </div>
   )
 }
-
-const DEFAULT_CHECKS = [
-  'Diaper / toilet check', 'Breakfast eaten', 'Teeth brushed',
-  'Vitamins / supplements', 'Sunscreen applied', 'Change of clothes packed',
-  'Nap bag packed (if going out)', 'Comfort toy ready for nap',
-]
 
 function MorningChecklist() {
   const [checks, setChecks] = useState<Record<number, boolean>>(() => {
@@ -187,7 +258,7 @@ function MorningChecklist() {
       <CardBody>
         <div className="divide-y divide-orange-50">
           {DEFAULT_CHECKS.map((item, i) => (
-            <label key={i} className="flex items-center gap-3 py-2.5 cursor-pointer group">
+            <label key={i} className="flex items-center gap-3 py-2.5 cursor-pointer">
               <input type="checkbox" checked={!!checks[i]} onChange={() => toggle(i)}
                 className="w-4 h-4 accent-brand-500 cursor-pointer flex-shrink-0" />
               <span className={`text-sm font-semibold transition-colors ${checks[i] ? 'line-through text-gray-300' : 'text-gray-700'}`}>{item}</span>

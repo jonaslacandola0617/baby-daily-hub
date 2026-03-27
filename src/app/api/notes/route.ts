@@ -5,10 +5,26 @@ import { today } from '@/lib/utils'
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const date = searchParams.get('date') || today()
-    const note = await prisma.note.findUnique({ where: { date } })
+    const date = searchParams.get('date')
+    const all = searchParams.get('all')
+
+    if (all === 'true') {
+      const notes = await prisma.note.findMany({
+        orderBy: { date: 'desc' },
+        where: {
+          OR: [
+            { dailyNotes: { not: null } },
+            { parentNotes: { not: null } },
+          ],
+        },
+      })
+      return NextResponse.json(notes)
+    }
+
+    const targetDate = date || today()
+    const note = await prisma.note.findUnique({ where: { date: targetDate } })
     if (!note) {
-      return NextResponse.json({ date, dailyNotes: null, parentNotes: null })
+      return NextResponse.json({ date: targetDate, dailyNotes: null, parentNotes: null })
     }
     return NextResponse.json(note)
   } catch (error) {

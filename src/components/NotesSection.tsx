@@ -4,18 +4,41 @@ import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { Plus, Trash2 } from 'lucide-react'
-import { Card, CardHeader, CardBody, Button, Input, SectionLabel, Spinner } from '@/components/ui'
+import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
+import { Card, CardHeader, CardBody, Button, SectionLabel, Spinner } from '@/components/ui'
 import { today } from '@/lib/utils'
 import type { Note, Appointment, BabyProfile } from '@/types'
+
+function formatNiceDate(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const isToday = dateStr === today()
+  if (isToday) return 'Today'
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+  const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`
+  if (dateStr === yStr) return 'Yesterday'
+  return `${days[date.getDay()]}, ${months[date.getMonth()]} ${d}`
+}
 
 export default function NotesSection() {
   const qc = useQueryClient()
   const date = today()
+  const [showHistory, setShowHistory] = useState(false)
+  const [expandedDate, setExpandedDate] = useState<string | null>(null)
 
+  // ── Today's note ──
   const { data: note, isLoading: notesLoading } = useQuery<Note>({
     queryKey: ['notes', date],
     queryFn: () => axios.get(`/api/notes?date=${date}`).then(r => r.data),
+  })
+
+  // ── All past notes ──
+  const { data: allNotes = [], isLoading: historyLoading, refetch: refetchHistory } = useQuery<Note[]>({
+    queryKey: ['notes-all'],
+    queryFn: () => axios.get('/api/notes?all=true').then(r => r.data),
+    enabled: showHistory,
   })
 
   const { data: appointments = [], isLoading: apptLoading } = useQuery<Appointment[]>({
@@ -29,9 +52,15 @@ export default function NotesSection() {
   })
 
   const notesMutation = useMutation({
-    mutationFn: (data: Partial<Note> & { date: string }) => axios.put('/api/notes', data).then(r => r.data),
-    onSuccess: (data) => { qc.setQueryData(['notes', date], data); toast.success('Notes saved!') },
-    onError: () => toast.error('Failed to save notes'),
+    mutationFn: (data: Partial<Note> & { date: string }) =>
+      axios.put('/api/notes', data).then(r => r.data),
+    onSuccess: (data) => {
+      qc.setQueryData(['notes', date], data)
+      // Invalidate history so it refreshes on next open
+      qc.invalidateQueries({ queryKey: ['notes-all'] })
+      toast.success('Saved!')
+    },
+    onError: () => toast.error('Failed to save'),
   })
 
   const profileMutation = useMutation({
@@ -41,13 +70,15 @@ export default function NotesSection() {
   })
 
   const addApptMutation = useMutation({
-    mutationFn: (data: { date: string; text: string; order: number }) => axios.post('/api/appointments', data).then(r => r.data),
+    mutationFn: (data: { date: string; text: string; order: number }) =>
+      axios.post('/api/appointments', data).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
     onError: () => toast.error('Failed to add appointment'),
   })
 
   const updateApptMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Appointment> }) => axios.patch(`/api/appointments/${id}`, data).then(r => r.data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Appointment> }) =>
+      axios.patch(`/api/appointments/${id}`, data).then(r => r.data),
     onSuccess: (updated: Appointment) => {
       qc.setQueryData(['appointments'], (old: Appointment[] = []) =>
         old.map(a => a.id === updated.id ? updated : a))
@@ -65,18 +96,22 @@ export default function NotesSection() {
 
   if (notesLoading || apptLoading) return <Spinner />
 
+  // Past notes = all except today
+  const pastNotes = allNotes.filter(n => n.date !== date)
+
   return (
     <div className="space-y-4">
-      {/* Notes */}
+
+      {/* ── Today's notes ── */}
       <Card>
-        <CardHeader icon="📝" title="Daily Notes" />
+        <CardHeader icon="📝" title="Today's Notes" />
         <CardBody className="space-y-4">
           <div>
-            <SectionLabel>Today's observations</SectionLabel>
+            <SectionLabel>Observations & moments</SectionLabel>
             <div className="border-l-4 border-purple-300 pl-3">
               <AutosaveTextarea
                 value={note?.dailyNotes ?? ''}
-                placeholder="Quick notes — behaviours, funny moments, things to remember..."
+                placeholder="What happened today? Funny moments, behaviours, things to remember..."
                 onCommit={v => notesMutation.mutate({ date, dailyNotes: v })}
                 rows={4}
               />
@@ -93,19 +128,88 @@ export default function NotesSection() {
               />
             </div>
           </div>
+          <p className="text-[11px] text-gray-400 font-semibold">Auto-saves when you click away. One entry per day — come back anytime to edit.</p>
         </CardBody>
       </Card>
 
-      {/* Appointments */}
+      {/* ── Notes history ── */}
+      <Card>
+        <CardHeader icon="📖" title="Past Notes">
+          <button
+            onClick={() => { setShowHistory(h => !h); if (!showHistory) refetchHistory() }}
+            className="flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-brand-500 transition-colors"
+          >
+            <BookOpen size={13} />
+            {showHistory ? 'Hide' : 'View history'}
+            {showHistory ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+        </CardHeader>
+
+        {showHistory && (
+          <CardBody className="p-0">
+            {historyLoading && <div className="py-6 flex justify-center"><div className="w-6 h-6 border-4 border-orange-200 border-t-brand-500 rounded-full animate-spin" /></div>}
+
+            {!historyLoading && pastNotes.length === 0 && (
+              <div className="px-5 py-8 text-center">
+                <p className="text-2xl mb-2">📭</p>
+                <p className="text-sm font-bold text-gray-400">No past notes yet</p>
+                <p className="text-xs text-gray-300 mt-1">Your daily notes will appear here</p>
+              </div>
+            )}
+
+            {!historyLoading && pastNotes.map(n => (
+              <div key={n.date} className="border-b border-orange-50 last:border-0">
+                <button
+                  onClick={() => setExpandedDate(expandedDate === n.date ? null : n.date)}
+                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-orange-50/50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-extrabold text-gray-700">{formatNiceDate(n.date)}</span>
+                    <span className="text-[10px] font-bold text-gray-300">{n.date}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {n.dailyNotes && <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">Notes</span>}
+                    {n.parentNotes && <span className="text-[10px] font-bold bg-teal-100 text-teal-600 px-2 py-0.5 rounded-full">Reminders</span>}
+                    {expandedDate === n.date ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+                  </div>
+                </button>
+
+                {expandedDate === n.date && (
+                  <div className="px-5 pb-4 space-y-3">
+                    {n.dailyNotes && (
+                      <div className="border-l-4 border-purple-200 pl-3">
+                        <p className="text-[10px] font-extrabold uppercase tracking-widest text-purple-400 mb-1">Observations</p>
+                        <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">{n.dailyNotes}</p>
+                      </div>
+                    )}
+                    {n.parentNotes && (
+                      <div className="border-l-4 border-teal-200 pl-3">
+                        <p className="text-[10px] font-extrabold uppercase tracking-widest text-teal-400 mb-1">Reminders</p>
+                        <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">{n.parentNotes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardBody>
+        )}
+      </Card>
+
+      {/* ── Appointments ── */}
       <Card>
         <CardHeader icon="📅" title="Upcoming Appointments">
-          <Button variant="ghost" onClick={() => addApptMutation.mutate({ date: '', text: '', order: appointments.length })} className="text-xs py-1.5 px-3">
+          <Button variant="ghost"
+            onClick={() => addApptMutation.mutate({ date: '', text: '', order: appointments.length })}
+            className="text-xs py-1.5 px-3">
             <Plus size={13} /> Add
           </Button>
         </CardHeader>
         <CardBody className="p-0">
           {appointments.length === 0 && (
-            <div className="px-5 py-6 text-center text-sm text-gray-400 font-semibold">No appointments yet — add one above</div>
+            <div className="px-5 py-6 text-center text-sm text-gray-400 font-semibold">
+              No appointments yet — add one above
+            </div>
           )}
           <div className="divide-y divide-orange-50">
             {appointments.map(appt => (
@@ -132,18 +236,18 @@ export default function NotesSection() {
         </CardBody>
       </Card>
 
-      {/* Profile settings */}
+      {/* ── Baby Profile ── */}
       <Card>
         <CardHeader icon="⚙️" title="Baby Profile" />
         <CardBody>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
-              <SectionLabel>Baby's name</SectionLabel>
+              <SectionLabel>Baby&apos;s name</SectionLabel>
               <InlineInput
                 value={profile?.name ?? ''}
                 placeholder="Enter name"
                 onCommit={v => profileMutation.mutate({ name: v })}
-                className="w-full px-3 py-2 rounded-xl border border-orange-100 bg-orange-50 font-nunito text-sm font-bold text-gray-800 outline-none focus:border-brand-400 focus:bg-white transition-colors"
+                className="w-full px-3 py-2 rounded-xl border border-orange-100 bg-orange-50 font-nunito text-sm font-bold text-gray-800 outline-none focus:border-brand-400 transition-colors"
               />
             </div>
             <div>
@@ -152,18 +256,24 @@ export default function NotesSection() {
                 value={profile?.birthdate ?? ''}
                 placeholder="e.g. 2023-03-01"
                 onCommit={v => profileMutation.mutate({ birthdate: v })}
-                className="w-full px-3 py-2 rounded-xl border border-orange-100 bg-orange-50 font-nunito text-sm font-bold text-gray-800 outline-none focus:border-brand-400 focus:bg-white transition-colors"
+                className="w-full px-3 py-2 rounded-xl border border-orange-100 bg-orange-50 font-nunito text-sm font-bold text-gray-800 outline-none focus:border-brand-400 transition-colors"
               />
             </div>
           </div>
-          <p className="text-xs text-gray-400 font-semibold mt-3">All data is saved to your Vercel Postgres database automatically.</p>
+          <p className="text-xs text-gray-400 font-semibold mt-3">
+            All data is saved to your Vercel Postgres database automatically.
+          </p>
         </CardBody>
       </Card>
     </div>
   )
 }
 
-function AutosaveTextarea({ value, onCommit, placeholder, rows = 3 }: { value: string; onCommit: (v: string) => void; placeholder?: string; rows?: number }) {
+// ── Reusable sub-components ────────────────────────────────────────────────
+
+function AutosaveTextarea({ value, onCommit, placeholder, rows = 3 }: {
+  value: string; onCommit: (v: string) => void; placeholder?: string; rows?: number
+}) {
   const [local, setLocal] = useState(value)
   useEffect(() => { setLocal(value) }, [value])
   const commit = useCallback(() => { if (local !== value) onCommit(local) }, [local, value, onCommit])
@@ -179,7 +289,9 @@ function AutosaveTextarea({ value, onCommit, placeholder, rows = 3 }: { value: s
   )
 }
 
-function InlineInput({ value, onCommit, placeholder, className }: { value: string; onCommit: (v: string) => void; placeholder?: string; className?: string }) {
+function InlineInput({ value, onCommit, placeholder, className }: {
+  value: string; onCommit: (v: string) => void; placeholder?: string; className?: string
+}) {
   const [local, setLocal] = useState(value)
   useEffect(() => { setLocal(value) }, [value])
   const commit = useCallback(() => { if (local !== value) onCommit(local) }, [local, value, onCommit])
