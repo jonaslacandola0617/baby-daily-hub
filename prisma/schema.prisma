@@ -1,0 +1,87 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model RoutineItem {
+  id        String   @id @default(cuid())
+  timeStart String
+  timeEnd   String?
+  activity  String
+  note      String?
+  category  String   // sleep | meal | play | care | learn | outdoor
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DailyTracker {
+  id           String   @id @default(cuid())
+  date         String   @unique // YYYY-MM-DD
+  sleepHours   Float    @default(11)
+  napHours     Float    @default(1.5)
+  waterCups    Int      @default(0)
+  diaperCount  Int      @default(0)
+  temperature  String?
+  weight       String?
+  medicine     String?
+  mood         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model MealLog {
+  id        String   @id @default(cuid())
+  date      String   @unique // YYYY-MM-DD
+  breakfast String?
+  lunch     String?
+  dinner    String?
+  snacks    String?
+  vitamins  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Milestone {
+  id        String   @id @default(cuid())
+  text      String
+  category  String
+  status    String   @default("pending") // done | progress | pending
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Note {
+  id          String   @id @default(cuid())
+  date        String   @unique // YYYY-MM-DD
+  dailyNotes  String?
+  parentNotes String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Appointment {
+  id        String   @id @default(cuid())
+  date      String
+  text      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BabyProfile {
+  id        String   @id @default(cuid())
+  name      String   @default("Your Little One")
+  birthdate String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
