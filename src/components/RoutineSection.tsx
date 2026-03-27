@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { Pencil, Trash2, Plus, Check, X } from 'lucide-react'
-import { Card, CardHeader, CardBody, Button, Input, Badge, SectionLabel, Spinner } from '@/components/ui'
+import { Pencil, Trash2, Plus, Check, X, GripVertical } from 'lucide-react'
+import { Card, CardHeader, CardBody, Button, Input, Badge, SectionLabel, Spinner, CategoryDot } from '@/components/ui'
 import type { RoutineItem, Category, BabyProfile } from '@/types'
 
 const CATEGORIES: Category[] = ['sleep', 'meal', 'play', 'care', 'learn', 'outdoor']
@@ -167,9 +167,9 @@ export default function RoutineSection() {
           {/* Routine rows — layout matching first screenshot exactly */}
           <div className="divide-y divide-orange-50">
             {items.map(item => (
-              <div key={item.id} className="group px-5 py-3.5">
+              <div key={item.id} className="group px-5 py-3">
                 {editingId === item.id ? (
-                  <div className="space-y-2 py-1">
+                  <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       <Input placeholder="Start time" value={editForm.timeStart} onChange={e => setEditForm(f => ({ ...f, timeStart: e.target.value }))} />
                       <Input placeholder="End time" value={editForm.timeEnd} onChange={e => setEditForm(f => ({ ...f, timeEnd: e.target.value }))} />
@@ -180,7 +180,7 @@ export default function RoutineSection() {
                       <span className="text-xs font-bold text-gray-500">Category:</span>
                       {CATEGORIES.map(c => (
                         <button key={c} onClick={() => setEditForm(f => ({ ...f, category: c }))}
-                          className={`rounded-full transition-all ${editForm.category === c ? 'ring-2 ring-offset-1 ring-brand-400 scale-105' : 'opacity-50'}`}>
+                          className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full transition-all ${editForm.category === c ? 'ring-2 ring-offset-1 ring-brand-400 scale-105' : 'opacity-60'}`}>
                           <Badge category={c} />
                         </button>
                       ))}
@@ -191,31 +191,24 @@ export default function RoutineSection() {
                     </div>
                   </div>
                 ) : (
-                  /* ── Row layout: [time] [dot] [activity + note] [badge] [actions] ── */
                   <div className="flex items-start gap-3">
-                    {/* Time — left column, fixed width */}
-                    <span className="text-[11px] font-bold text-gray-400 whitespace-nowrap min-w-[96px] pt-1 leading-tight">
-                      {item.timeStart}{item.timeEnd ? ` – ${item.timeEnd}` : ''}
-                    </span>
-
-                    {/* Coloured dot */}
-                    <span className={`mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${DOT_COLORS[item.category] ?? 'bg-gray-400'}`} />
-
-                    {/* Activity + note */}
+                    <GripVertical size={14} className="text-gray-200 mt-1 flex-shrink-0" />
+                    <CategoryDot category={item.category} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-800 leading-snug">{item.activity}</p>
-                      {item.note && <p className="text-xs text-gray-400 font-medium mt-0.5">{item.note}</p>}
+                      <div className="flex justify-between items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold text-gray-400 whitespace-nowrap">
+                          {item.timeStart}{item.timeEnd ? ` – ${item.timeEnd}` : ''}
+                        </span>
+                        <Badge category={item.category} />
+                      </div>
+                      <p className="text-sm font-bold text-gray-800 mt-0.5">{item.activity}</p>
+                      {item.note && <p className="text-xs text-gray-400 font-semibold mt-0.5">{item.note}</p>}
                     </div>
-
-                    {/* Category badge */}
-                    <Badge category={item.category} />
-
-                    {/* Edit / delete — visible on hover */}
-                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <button onClick={() => startEdit(item)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-300 hover:text-brand-500 transition-colors">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button onClick={() => startEdit(item)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-brand-500 transition-colors">
                         <Pencil size={13} />
                       </button>
-                      <button onClick={() => deleteMutation.mutate(item.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+                      <button onClick={() => deleteMutation.mutate(item.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors">
                         <Trash2 size={13} />
                       </button>
                     </div>
