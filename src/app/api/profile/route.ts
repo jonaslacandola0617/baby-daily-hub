@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     let profile = await prisma.babyProfile.findFirst()
@@ -20,14 +22,17 @@ export async function PUT(req: NextRequest) {
     let profile = await prisma.babyProfile.findFirst()
     if (!profile) {
       profile = await prisma.babyProfile.create({
-        data: { name: body.name ?? 'Your Little One', birthdate: body.birthdate ?? null },
+        data: {
+          name: body.name ?? 'Your Little One',
+          birthdate: body.birthdate ?? null,
+        },
       })
     } else {
       profile = await prisma.babyProfile.update({
         where: { id: profile.id },
         data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.birthdate !== undefined && { birthdate: body.birthdate }),
+          ...(body.name      !== undefined && { name: body.name }),
+          ...(body.birthdate !== undefined && { birthdate: body.birthdate || null }),
         },
       })
     }

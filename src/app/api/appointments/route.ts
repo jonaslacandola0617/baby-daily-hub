@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const appointments = await prisma.appointment.findMany({ orderBy: { order: 'asc' } })
@@ -14,12 +16,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { date, text, order } = body
-    if (!date || !text) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
+    // Allow empty date/text on creation — user fills them in after
     const appointment = await prisma.appointment.create({
-      data: { date, text, order: order ?? 0 },
+      data: {
+        date:  body.date  ?? '',
+        text:  body.text  ?? '',
+        order: body.order ?? 0,
+      },
     })
     return NextResponse.json(appointment, { status: 201 })
   } catch (error) {
