@@ -221,7 +221,7 @@ export default function ToysSection() {
   const logs = data?.logs ?? [];
   const settings = data?.settings ?? {
     id: "",
-    activeSetSize: 4,
+    activeSetSize: 10,
     scheduleDays: 7,
     lastRotatedAt: null,
     nextRotationAt: null,
@@ -435,7 +435,7 @@ function ShelfTab({
                       Active set size
                     </p>
                     <div className="flex gap-1.5 flex-wrap">
-                      {[3, 4, 5, 6].map((n) => (
+                      {[4, 6, 8, 10].map((n) => (
                         <button
                           key={n}
                           onClick={() => setSetSize(n)}

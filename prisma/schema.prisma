@@ -89,7 +89,7 @@ model RotationLog {
 
 model RotationSettings {
   id             String    @id @default(cuid())
-  activeSetSize  Int       @default(4)
+  activeSetSize  Int       @default(10)
   scheduleDays   Int       @default(7)
   lastRotatedAt  DateTime?
   nextRotationAt DateTime?
