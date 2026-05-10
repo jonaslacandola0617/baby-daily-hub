@@ -62,6 +62,41 @@ model Recipe {
   updatedAt   DateTime @updatedAt
 }
 
+model Toy {
+  id           String    @id @default(cuid())
+  name         String
+  category     String
+  description  String?
+  emoji        String    @default("🧸")
+  isActive     Boolean   @default(false)
+  isFavourite  Boolean   @default(false)
+  loveCount    Int       @default(0)
+  lastActiveAt DateTime?
+  order        Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model RotationLog {
+  id           String   @id @default(cuid())
+  rotatedAt    DateTime @default(now())
+  theme        String?
+  activeSetIds String
+  inIds        String
+  outIds       String
+  notes        String?
+}
+
+model RotationSettings {
+  id             String    @id @default(cuid())
+  activeSetSize  Int       @default(4)
+  scheduleDays   Int       @default(7)
+  lastRotatedAt  DateTime?
+  nextRotationAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
 model Milestone {
   id        String   @id @default(cuid())
   text      String
